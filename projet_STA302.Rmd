@@ -1,0 +1,65 @@
+---
+title: "projet sta302"
+output: html_document
+date: "2022-11-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+```
+
+```{r}
+base<-read.delim("~/Desktop/Master ST/M2/STA302/projet/base_3C_CVideal.txt")
+#View(base)
+```
+
+```{r}
+library(reshape2)
+
+var <- colnames(base[c("AGE0","AGE1","AGE2","AGE4","AGE5","AGE6")])
+var2 <- colnames(base[c("CESDT0","CESDT1","CESDT2","CESDT4","CESDT5","CESDT6")])
+
+Base <- melt(base,id.vars = "ID", measure.vars = var)
+Base <- Base[order(Base$ID),]
+
+Base2 <- melt(base,id.vars = "ID", measure.vars = var2)
+Base2 <- Base2[order(Base2$ID),]
+
+Base1 <- cbind(Base, Base2[,2:3])
+
+base <- merge(Base1, base, by = "ID")
+base <- base[,-c(4,9:10,16:20,23:27)]
+
+names(base)[2]<-"visite"
+names(base)[3]<-"age_vis"
+names(base)[4]<-"Score_CESDT"
+```
+
+```{r}
+library(stringr)
+#grepl("AGE", base$age_id) 
+base$visite <- str_sub(base$visite, start = 4L)
+```
+
+```{r}
+write.csv(base, file = "base.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
