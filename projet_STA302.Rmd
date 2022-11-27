@@ -42,9 +42,429 @@ library(stringr)
 base$visite <- str_sub(base$visite, start = 4L)
 ```
 
+#variables indépendantes du temps
 ```{r}
-write.csv(base, file = "base.csv")
+var_indep_tps <- unique(base[,c("ID","DC6","AGEFIN6","SEXE","DEM0_6","AGEDEM6","CENTRE","ETUDE_clas0","antidep0","som","AGE0")])
+dim(var_indep_tps)
 ```
+Il y a 6626 sujets dans l'étude.
+```{r}
+var_indep_tps_na <- na.omit(var_indep_tps)
+```
+Il n'y a pas de données manquante pour ces variables.
+```{r message=FALSE}
+library(epiR)
+library(prettyR)
+summary(var_indep_tps)
+```
+Le score (sur 7 points) médian des sujets de l'étude est de 3 
+points (Q1-Q3=2 points-4 points).
+
+```{r}
+epi.descriptives(var_indep_tps$AGE0)
+epi.descriptives(var_indep_tps$AGEFIN6[var_indep_tps$DC6==1])$arithmetic
+epi.descriptives(var_indep_tps$AGEDEM6[var_indep_tps$DEM0_6==1])$arithmetic
+
+```
+1550 sujets sont décédés au cours de l'étude. Soit 23.39% des sujets.
+Leur âge moyen au décès est de 84.55 ans avec un écart-type de 6.27 ans.
+659 sont devenus dément au cours de l'étude. Soit 9.95% des sujets.
+Leur âge d'appartition de la démence est de 82.06 ans avec un écart-type de 5.48 ans.
+```{r}
+freq(var_indep_tps$SEXE)
+freq(var_indep_tps$ETUDE_clas0)
+freq(var_indep_tps$CENTRE)
+freq(var_indep_tps$antidep0)
+```
+Il y a 4200 femmes/hommes (63.4%) et 2426 hommes/femmes (36.6%).
+
+1256 sujets sont allés dans l'enseignement supérieur (19%).
+1351 sujets ont arrêté leurs études après avoir suivis un cursus long dans le secondaire (20.4%).
+2450 sujets ont arrêté leurs études après avoir suivis un cursus court dans le secondaire (37.0%).
+1566 sujets n'ont pas fait d'étude ou se sont arrêtés après NIVEAU PRIMAIRE (23.6%).
+
+1284 sujets sont suivis à Bordeaux (19.4%), 1640 à Montpellier (24.8%) et 3702 à Dijon (55.9%).
+
+427 sujets (6.4%) avaient un traitement anti-dépresseur à l'inclusion.
+
+#Distribution du score
+```{r}
+hist(base$Score_CESDT)
+hist(sqrt(base$Score_CESDT))
+```
+Parmi les transformations basiques, celle donnant une distribution la plus proche d'une distribution gaussienne est la racine carré.
+
+
+```{r}
+library(lattice)
+nbmes <- table(Base1$ID[!is.na(Base1[,5])])
+quantile(nbmes,probs=(c(0,0.25,0.5,0.75,1)))
+```
+Le délai considéré est l'age des sujets. A DISCUTER
+
+#Regarder un peu données manquantes
+
+```{r}
+table(is.na(base$Score_CESDT))
+table(is.na(base$age_vis))
+NA_age <- subset(base,is.na(age_vis))
+table(is.na(NA_age$Score_CESDT))
+```
+Pour 9 440 visites nous n'avons ni l'âge du sujet ni le score CES-D. Cela correspond à 4019 sujets.
+
+Pour 647 visites nous n'avons pas le score CES-D correspondant.
+```{r}
+unique(NA_age$ID)
+```
+
+```{r}
+NA_age_DCD <- subset(NA_age,DC6==1)
+unique(NA_age_DCD$ID)
+```
+(2469 sujets ont des visites pour lesquelles l'age et le score CES-D ne sont pas renseignés alors qu'ils ne sont pas décédé au cours de l'études. Cela représente 61.4% des sujets pour lesquelles ces données sont manquantes.)
+
+```{r}
+NA_CESD <- subset(base,is.na(Score_CESDT))
+NA_CESD_DCD <- subset(NA_CESD,DC6==1)
+NA_CESD_VIV <- subset(NA_CESD,DC6==0)
+
+unique(NA_CESD$ID)
+freq(NA_CESD$visite)
+freq(NA_CESD_DCD$visite)
+freq(NA_CESD_VIV$visite)
+
+```
+Les visites pour lesquelles il manque le plus souvent le score CES-D sont dans l'ordre décroissant la 6ième à la visite initiale.
+
+```{r message=F}
+library(tidyr)
+library(dplyr)
+#NA_seul_CESD <- drop_na(NA_CESD,age_vis)
+#freq(NA_seul_CESD$DC6)
+#NA_seul_CESD_DCD <- subset(NA_seul_CESD,DC6==1)
+#unique(NA_seul_CESD_DCD$ID)
+```
+
+```{r}
+#base$DonObs <- ifelse(is.na(base$age_vis)|is.na(base$Score_CESDT),1,0)
+base$DonManq <- ifelse(is.na(base$age_vis)|is.na(base$Score_CESDT),1,0)
+freq(base$DonManq)
+DonManq <- subset(base,DonManq==1)
+PasDonManq <- subset(base,DonManq==0)
+unique(PasDonManq$ID)
+
+freq(DonManq$DC6)
+unique(DonManq$ID[DonManq$DC6==1])
+unique(DonManq$ID[DonManq$DC6==0])
+
+freq(PasDonManq$DC6)
+unique(PasDonManq$ID[PasDonManq$DC6==1])
+unique(PasDonManq$ID[PasDonManq$DC6==0])
+
+chisq.test(base$DC6,base$DonManq)$expected
+table(base$DC6,base$DonManq)
+chisq.test(base$DC6,base$DonManq,correct=F)
+
+DM_DC_VIV <- c(1547,2691)
+PasDM_DC_VIV <- c(1547,5074)
+tab=matrix(c(DM_DC_VIV, PasDM_DC_VIV),2,2,byrow=T)
+
+chisq.test(tab)$expected
+chisq.test(tab,correct=F)
+
+```
+Plus de DC chez les Données Manquantes (logique).
+
+```{r}
+freq(DonManq$DEM0_6)
+unique(DonManq$ID[DonManq$DEM0_6==1])
+unique(DonManq$ID[DonManq$DEM0_6==0])
+
+freq(PasDonManq$DEM0_6)
+unique(PasDonManq$ID[PasDonManq$DEM0_6==1])
+unique(PasDonManq$ID[PasDonManq$DEM0_6==0])
+
+chisq.test(base$DEM0_6,base$DonManq)$expected
+table(base$DEM0_6,base$DonManq)
+chisq.test(base$DEM0_6,base$DonManq,correct=F)
+
+DM_Dem_Sain <- c(576,3665)
+PasDM_Dem_Sain <- c(659,5962)
+tab=matrix(c(DM_Dem_Sain, PasDM_Dem_Sain),2,2,byrow=T)
+
+chisq.test(tab)$expected
+chisq.test(tab,correct=F)
+
+freq(DonManq$visite[DonManq$DEM0_6==1])
+freq(DonManq$visite[DonManq$DEM0_6==0])
+
+```
+
+
+
+```{r message=F}
+library(psych)
+describeBy(base,base$DonManq)
+```
+
+#enlever
+```{r}
+freq(DonManq$visite)
+freq(PasDonManq$visite)
+chisq.test(base$DonManq,base$visite)
+```
+Plus la visite est tard dans le suivi plus il y a de DM (explicable en parti par les décés).
+
+```{r}
+freq(DonManq$SEXE)
+freq(PasDonManq$SEXE)
+chisq.test(base$DonManq,base$SEXE,correct=F)$expected
+```
+plus grande part de SEXE=0 dans les données manquantes comparé aux données pas manquantes.
+
+#Retrait 5 sujets sans CES-D
+```{r}
+base2 <- subset(base, ID!=621&ID!=3874&ID!=5039&ID!=5432&ID!=5433)
+base2$delai_init <- base2$age_vis-base2$AGE0
+base2$CESD_rac_carr <- sqrt(base2$Score_CESDT)
+```
+
+#plots des trajectoires
+##plot délai
+```{r}
+color <- base2$ID
+xyplot(Score_CESDT~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
+```
+#Avec transfo racine carrée du score CES-D
+```{r}
+xyplot(CESD_rac_carr~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
+```
+
+##plot age_vis
+```{r}
+xyplot(Score_CESDT~age_vis,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
+```
+
+
+#modele depression~age (intercept+pente vs intercept seul)
+```{r}
+library(nlme)
+m_vide_intETpente <- lme(fixed=Score_CESDT~age_vis,data=base2,random=~age_vis|
+                ID,method="ML",na.action=na.omit)
+m_vide_int <- 
+lme(fixed=Score_CESDT~age_vis,data=base2,random=~1|
+                ID,method="ML",na.action=na.omit)
+anova(m_vide_int,m_vide_intETpente)
+```
+
+```{r}
+devm_intm_intETpent <- 2*logLik(m_vide_intETpente) - 2*logLik(m_vide_int)
+pm1m2 <- 0.5*(1-pchisq(devm_intm_intETpent,df=2)) + 0.5*(1-pchisq(devm_intm_intETpent,df=1))
+pm1m2
+```
+On garde une pente aléatoire.
+
+
+#Même chose délai
+```{r}
+m_vide_intETpente_del <- lme(fixed=Score_CESDT~delai_init,data=base2,random=~delai_init|
+                ID,method="ML",na.action=na.omit)
+m_vide_int_del <- 
+lme(fixed=Score_CESDT~age_vis,data=base,random=~1|
+                ID,method="ML",na.action=na.omit)
+anova(m_vide_int_del,m_vide_intETpente_del)
+```
+
+```{r}
+devm_intm_intETpent_del <- 2*logLik(m_vide_intETpente_del) - 2*logLik(m_vide_int_del)
+pm1m2 <- 0.5*(1-pchisq(devm_intm_intETpent_del,df=2)) + 0.5*(1-pchisq(devm_intm_intETpent,df=1))
+pm1m2
+```
+là aussi on garderait la pente
+
+#Modèle avec racine carré du score CES-D (pour que Y soit normal)
+```{r}
+m_vide_intETpente_transfoY_del <- lme(fixed=CESD_rac_carr~delai_init,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+
+m_vide_int_transfoY_del <- 
+lme(fixed=CESD_rac_carr~delai_init,data=base2, random=~1|ID,method="ML",na.action=na.omit)
+#problème convergence modèle qu'avec intercept
+summary(m_vide_intETpente_transfoY_del)
+```
+
+#effets aléatoires indépendants ?
+```{r}
+m1indep <- lme(fixed = CESD_rac_carr ~ delai_init,
+              data = base2,
+              random = list(~ 1 |ID, ~-1 + delai_init|ID) ,method="ML",na.action=na.omit )
+summary(m1indep)
+anova(m1indep,m_vide_intETpente_transfoY_del)
+#rapport vraissemblance
+devm1indep <- 2*logLik(m_vide_intETpente_transfoY_del) - 2*logLik(m1indep)
+p <- 1-pchisq(devm1indep ,df=1)
+p
+```
+Les effets aléatoires semblent être corrélés entre eux.
+
+#SEXE
+```{r}
+mSEXE <- lme(fixed=CESD_rac_carr~delai_init*SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mSEXE)
+```
+intéraction avec le sexe non pertinente
+
+```{r}
+mSEXE <- lme(fixed=CESD_rac_carr~delai_init+SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mSEXE)
+```
+sans intéraction oui
+
+#Antidépresseur
+
+```{r}
+mAntidep <- lme(fixed=CESD_rac_carr~delai_init*antidep0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mAntidep)
+```
+intéraction signif
+
+#Niveau d'éducation
+
+```{r}
+mNivEduc <- lme(fixed=CESD_rac_carr~delai_init*ETUDE_clas0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mNivEduc)
+```
+intéraction non signif
+```{r}
+mNivEduc <- lme(fixed=CESD_rac_carr~delai_init+ETUDE_clas0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mNivEduc)
+```
+
+#age initial
+
+```{r}
+mAgeInit <- lme(fixed=CESD_rac_carr~delai_init*I(AGE0-65),data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mAgeInit)
+```
+interaction significative
+
+#Ville
+
+```{r}
+mVILLE <- lme(fixed=CESD_rac_carr~delai_init*CENTRE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mVILLE)
+```
+interaction significative
+
+#score cardiovasculaire
+```{r}
+mCardioVasc <- lme(fixed=CESD_rac_carr~delai_init+som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mCardioVasc)
+```
+```{r}
+mCardioVasc_int <- lme(fixed=CESD_rac_carr~delai_init*som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(mCardioVasc_int)
+```
+interaction significative
+
+#modèle
+
+```{r}
+modele <- lme(fixed=CESD_rac_carr~delai_init*(som+CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(modele)
+```
+```{r}
+(1.49)^2
+0.12^2
+(-0.08)^2#A VOIR
+0.46^2
+1.05^2
+0.03^2
+-0.05^2#A VOIR
+0.62^2
+-0.002^2#A VOIR
+-0.06^2#A VOIR
+-0.04^2#A VOIR
+0.001^2
+```
+
+```{r}
+modele_interSOM = lme(fixed=CESD_rac_carr~delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(modele_interSOM)
+
+```
+enlever l'interaction som:delai_init ne bouge rien (donc possible de le faire).
+A VOIR ce qu'on choisit de montrer.
+
+```{r}
+plot(modele_interSOM)
+#hétéroscédasticité
+head(modele_interSOM$fitted)
+head(modele_interSOM$residuals)
+head(modele_interSOM$coefficients$random$ID)
+```
+regarder pour le problème d'hétéroscédasticité.
+```{r}
+{
+par(mfrow=c(1,2))
+hist(modele_interSOM$coefficients$random$ID[,1],xlab="intercept",main="predicted random intercept")
+hist(modele_interSOM$coefficients$random$ID[,2],xlab="pente",main="predicted random slope")
+}
+```
+
+
+
+#hlme packkage lcmm pour autocorrelation
+
+```{r}
+library(lcmm)
+hlmeModele <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
+random=~ (1 + delai_init), subject="ID",
+data = base2, verbose=F)
+
+summary(hlmeModele)
+```
+```{r}
+hlmeAR <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
+random=~ (1 + delai_init), subject="ID",
+data = base2,cor=AR(delai_init), verbose=F)
+
+summary(hlmeAR)
+```
+
+```{r}
+summarytable(hlmeAR,hlmeModele,which=c("npm","loglik","AIC"))
+```
+
+```{r}
+hlmeBM <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
+random=~ (1 + delai_init), subject="ID",
+data = base2,cor=BM(delai_init), verbose=F)
+
+summary(hlmeBM)
+```
+```{r}
+summarytable(hlmeAR,hlmeModele,hlmeBM,which=c("npm","loglik","AIC"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
