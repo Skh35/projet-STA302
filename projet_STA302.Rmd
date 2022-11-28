@@ -1,7 +1,9 @@
 ---
 title: "projet sta302"
-output: html_document
-date: "2022-11-16"
+output:
+  html_document: default
+  pdf_document: default
+date: '2022-11-16'
 ---
 
 ```{r setup, include=FALSE}
@@ -12,9 +14,10 @@ rm(list=ls())
 ```{r}
 base<-read.delim("~/Desktop/Master ST/M2/STA302/projet/base_3C_CVideal.txt")
 #View(base)
+#base <- read.delim("C:/Users/raphg/Dropbox/Mon PC (LAPTOP-6FCFUDBQ)/Documents/R/projet 302/base_3C_CVideal.txt")
 ```
 
-```{r}
+```{r warning=FALSE}
 library(reshape2)
 
 var <- colnames(base[c("AGE0","AGE1","AGE2","AGE4","AGE5","AGE6")])
@@ -29,7 +32,7 @@ Base2 <- Base2[order(Base2$ID),]
 Base1 <- cbind(Base, Base2[,2:3])
 
 base <- merge(Base1, base, by = "ID")
-base <- base[,-c(4,9:10,16:20,23:27)]
+base <- base[,-c(4,9,16:20,23:27)]
 
 names(base)[2]<-"visite"
 names(base)[3]<-"age_vis"
@@ -41,6 +44,13 @@ library(stringr)
 #grepl("AGE", base$age_id) 
 base$visite <- str_sub(base$visite, start = 4L)
 ```
+
+```{r}
+write.csv(base, file = "base.csv")
+```
+
+
+
 
 #variables indépendantes du temps
 ```{r}
@@ -90,6 +100,7 @@ Il y a 4200 femmes/hommes (63.4%) et 2426 hommes/femmes (36.6%).
 #Distribution du score
 ```{r}
 hist(base$Score_CESDT)
+hist(log(base$Score_CESDT))
 hist(sqrt(base$Score_CESDT))
 ```
 Parmi les transformations basiques, celle donnant une distribution la plus proche d'une distribution gaussienne est la racine carré.
@@ -233,64 +244,47 @@ base2$CESD_rac_carr <- sqrt(base2$Score_CESDT)
 ##plot délai
 ```{r}
 color <- base2$ID
-xyplot(Score_CESDT~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
+xyplot(log(Score_CESDT+0.5)~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
 ```
 #Avec transfo racine carrée du score CES-D
 ```{r}
 xyplot(CESD_rac_carr~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
 ```
 
-##plot age_vis
 ```{r}
-xyplot(Score_CESDT~age_vis,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
+library(ggplot2)
+p <- (ggplot(base2)
++ geom_line(aes(x = delai_init, y = CESD_rac_carr, group = ID), color="grey30", alpha = 0.8)
++ stat_smooth(aes(x = delai_init, y = CESD_rac_carr), method = "loess", size = 0.75)
++ theme_bw()
++ xlab("Temps depuis l'entrée dans l'étude (en d'années)")
++ ylab("Racine carré du Score CESD")
+)
+p
+
 ```
+
 
 
 #modele depression~age (intercept+pente vs intercept seul)
-```{r}
-library(nlme)
-m_vide_intETpente <- lme(fixed=Score_CESDT~age_vis,data=base2,random=~age_vis|
-                ID,method="ML",na.action=na.omit)
-m_vide_int <- 
-lme(fixed=Score_CESDT~age_vis,data=base2,random=~1|
-                ID,method="ML",na.action=na.omit)
-anova(m_vide_int,m_vide_intETpente)
-```
-
-```{r}
-devm_intm_intETpent <- 2*logLik(m_vide_intETpente) - 2*logLik(m_vide_int)
-pm1m2 <- 0.5*(1-pchisq(devm_intm_intETpent,df=2)) + 0.5*(1-pchisq(devm_intm_intETpent,df=1))
-pm1m2
-```
-On garde une pente aléatoire.
-
-
-#Même chose délai
-```{r}
-m_vide_intETpente_del <- lme(fixed=Score_CESDT~delai_init,data=base2,random=~delai_init|
-                ID,method="ML",na.action=na.omit)
-m_vide_int_del <- 
-lme(fixed=Score_CESDT~age_vis,data=base,random=~1|
-                ID,method="ML",na.action=na.omit)
-anova(m_vide_int_del,m_vide_intETpente_del)
-```
-
-```{r}
-devm_intm_intETpent_del <- 2*logLik(m_vide_intETpente_del) - 2*logLik(m_vide_int_del)
-pm1m2 <- 0.5*(1-pchisq(devm_intm_intETpent_del,df=2)) + 0.5*(1-pchisq(devm_intm_intETpent,df=1))
-pm1m2
-```
-là aussi on garderait la pente
-
 #Modèle avec racine carré du score CES-D (pour que Y soit normal)
 ```{r}
-m_vide_intETpente_transfoY_del <- lme(fixed=CESD_rac_carr~delai_init,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
-
-m_vide_int_transfoY_del <- 
-lme(fixed=CESD_rac_carr~delai_init,data=base2, random=~1|ID,method="ML",na.action=na.omit)
+m_vide_intETpente_transfoY_del <- hlme(CESD_rac_carr ~ I(delai_init/5),
+random=~ (1+I(delai_init/5)), subject="ID",
+data = base2, verbose=F)
+m_vide_int_transfoY_del <- hlme(CESD_rac_carr ~ I(delai_init/5),
+random=~ 1, subject="ID",
+data = base2, verbose=F)
 #problème convergence modèle qu'avec intercept
 summary(m_vide_intETpente_transfoY_del)
+summary(m_vide_int_transfoY_del)
+
+
+devm1m2 <- 2*-47006.44 - 2*-47177.09 
+pm1m2 <- 0.5*(1-pchisq(devm1m2,df=2)) + 0.5*(1-pchisq(devm1m2,df=1))
+pm1m2
 ```
+On garde la pente aléatoire.
 
 #effets aléatoires indépendants ?
 ```{r}
@@ -369,23 +363,10 @@ interaction significative
 #modèle
 
 ```{r}
-modele <- lme(fixed=CESD_rac_carr~delai_init*(som+CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
-summary(modele)
+modele <- lme(fixed=CESD_rac_carr~delai_init*(som+factor(CENTRE)+factor(antidep0)+I(AGE0-65))+factor(ETUDE_clas0)+factor(SEXE),data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
+summary(modele)#mettre Dijon en ref pour le centre
 ```
-```{r}
-(1.49)^2
-0.12^2
-(-0.08)^2#A VOIR
-0.46^2
-1.05^2
-0.03^2
--0.05^2#A VOIR
-0.62^2
--0.002^2#A VOIR
--0.06^2#A VOIR
--0.04^2#A VOIR
-0.001^2
-```
+
 
 ```{r}
 modele_interSOM = lme(fixed=CESD_rac_carr~delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
@@ -396,88 +377,48 @@ enlever l'interaction som:delai_init ne bouge rien (donc possible de le faire).
 A VOIR ce qu'on choisit de montrer.
 
 ```{r}
-plot(modele_interSOM)
+plot(modele)
 #hétéroscédasticité
-head(modele_interSOM$fitted)
-head(modele_interSOM$residuals)
-head(modele_interSOM$coefficients$random$ID)
+head(modele$fitted)
+head(modele$residuals)
+head(modele$coefficients$random$ID)
 ```
 regarder pour le problème d'hétéroscédasticité.
 ```{r}
+#rajouter la densité au dessus
 {
 par(mfrow=c(1,2))
-hist(modele_interSOM$coefficients$random$ID[,1],xlab="intercept",main="predicted random intercept")
-hist(modele_interSOM$coefficients$random$ID[,2],xlab="pente",main="predicted random slope")
+hist(modele$coefficients$random$ID[,1],xlab="intercept",main="predicted random intercept")
+hist(modele$coefficients$random$ID[,2],xlab="pente",main="predicted random slope")
 }
 ```
 
 
 
-#hlme packkage lcmm pour autocorrelation
+#hlme package lcmm pour Autoregressif et Brownien
 
 ```{r}
 library(lcmm)
-hlmeModele <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
+hlmeModele <- hlme(CESD_rac_carr ~ I(delai_init/5)*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE),
 random=~ (1 + delai_init), subject="ID",
 data = base2, verbose=F)
 
 summary(hlmeModele)
 ```
+
 ```{r}
-hlmeAR <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
+hlmeAR <- hlme(CESD_rac_carr ~ I(delai_init/5)*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE),
 random=~ (1 + delai_init), subject="ID",
 data = base2,cor=AR(delai_init), verbose=F)
 
 summary(hlmeAR)
 ```
 
+
 ```{r}
 summarytable(hlmeAR,hlmeModele,which=c("npm","loglik","AIC"))
 ```
-
 ```{r}
-hlmeBM <- hlme(CESD_rac_carr ~ delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,
-random=~ (1 + delai_init), subject="ID",
-data = base2,cor=BM(delai_init), verbose=F)
-
-summary(hlmeBM)
+tab <- cbind(summary(hlmeAR)[,-3],summary(hlmeModele)[,-3])
 ```
-```{r}
-summarytable(hlmeAR,hlmeModele,hlmeBM,which=c("npm","loglik","AIC"))
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
