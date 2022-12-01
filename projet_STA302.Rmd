@@ -416,28 +416,26 @@ summary(hlmeAR)
 ```{r}
 summarytable(hlmeAR,hlmeModele,which=c("npm","loglik","AIC"))
 ```
+
 ```{r}
 tab <- cbind(summary(hlmeAR)[,-3],summary(hlmeModele)[,-3])
 ```
 
 ```{r}
+base <- readRDS("base.rds")
+base2 <- readRDS("base2.rds")
 base2$time_5 <- base2$delai_init/5
 
+#hlmeAR <- hlme(CESD_rac_carr ~ time_5*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE)+factor(SEXE):som,
+     #          random=~ (1 + time_5), subject="ID",
+     #          data = base2,cor=AR(time_5), verbose=F)
 
 
-hlmeAR <- hlme(CESD_rac_carr ~ time_5*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE)+factor(SEXE):som,
-               random=~ (1 + time_5), subject="ID",
-               data = base2,cor=AR(time_5), verbose=F)
-
-
-lme(fixed = logPSA ~ times+ I((times-2)*(times>2))
-    ,
-    data = data_long,
-    random = ~ times+I((times-2)*(times>2))| id ,method="ML",na.action=na.omit )
-
-
-
-###
+#lme(fixed = logPSA ~ times+ I((times-2)*(times>2))
+    #,
+    #data = data_long,
+   # random = ~ times+I((times-2)*(times>2))| id ,method="ML",na.action=na.omit )
+####
 
 # creation des variables centres
 
@@ -461,18 +459,17 @@ summary(lmeAR)
 
 AIC(lmeAR)
 
-lmeAR2=lme(fixed=CESD_rac_carr~ time_5*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE)+factor(SEXE):som
-           , random=~ time_5 | ID,
-           data = base2, method="ML",na.action=na.omit, correlation = corCAR1(form = ~time_5 | ID))
+#lmeAR2=lme(fixed=CESD_rac_carr~ time_5*(factor(CENTRE)+factor(antidep0)+I(AGE0-65)+som)+factor(ETUDE_clas0)+factor(SEXE)+factor(SEXE):som
+   #        , random=~ time_5 | ID,
+   #        data = base2, method="ML",na.action=na.omit, correlation = corCAR1(form = ~time_5 | ID))
 
 
-summary(lmeAR)
-AIC(lmeAR2)
+#summary(lmeAR)
+#AIC(lmeAR2)
 
 ## Modele de Cox
 
 #delai demence
-
 
 base2$delai_dem=base2$AGEDEM6-base2$AGE0
 
@@ -493,17 +490,18 @@ summary(coxFit)
 ###
 
 
-jm1=jointModel(lmeObject = lmeAR,
-           survObject = coxFit,
-           timeVar = "time_5",
-           parameterization = "value", # association = pente courante non bruit?e
-           method = "spline-PH-aGH",
-           control = list(GHk = 3),
-           verbose = TRUE)
+#jm1=jointModel(lmeObject = lmeAR,
+ #          survObject = coxFit,
+ #          cluster="ID",
+ #          timeVar = "time_5",
+  #         parameterization = "value", # association = pente courante non bruité
+  #         method = "spline-PH-aGH",
+   #        control = list(GHk = 3),
+   #        verbose = TRUE)
 
-summary(jm1)
-summary(lmeAR)
-summary(coxFit)
+#summary(jm1)
+#summary(lmeAR)
+#summary(coxFit)
 
 
 dForm <-
@@ -532,4 +530,84 @@ summary(jm3)
 
 
 ```
+
+#### Adéquation 
+
+##### Pour le modèle mixte linéaire
+
+```{r}
+qqnorm(lmeAR)
+```
+
+
+```{r}
+# plot residus standardisés : ici bien homoscédastiques
+plot(lmeAR)
+```
+
+```{r}
+# valeurs fittées au niveau marginal (fixed) et individuel (ID)
+head(lmeAR$fitted)
+```
+
+```{r}
+# résidus au niveau marginal (fixed) et individuel (ID)
+head(lmeAR$residuals)
+```
+
+```{r}
+# matrice donnant les effets aléatoires prédits
+head(lmeAR$coefficients$random$ID)
+```
+
+```{r}
+hist(lmeAR$coefficients$random$ID[,1],xlab="intercept",main="predicted random intercep")
+hist(lmeAR$coefficients$random$ID[,2],xlab="pente",main="predicted random slope")
+```
+
+##### Pour le modèle conjoint
+
+```{r}
+plot(jm3)
+```
+
+```{r}
+head(cbind(
+  "Marg" = fitted(jm3, process = "Longitudinal"),
+  "Subj" = fitted(jm3, process = "Longitudinal", type = "Subject")))
+```
+
+
+```{r}
+# fonction de survie (marginale et spécifique au sujet)
+head(cbind(
+  "Marg" = fitted(jm3, process = "Event"),
+  "Subj" = fitted(jm3, process = "Event", type = "Subject")))
+```
+
+```{r}
+# On peut construire des intervalles de confiance à $95\%$ # pour les effets fixes du sous-modèle longitudinal 
+round(confint(jm3, parm = "Longitudinal"), 3)
+```
+
+```{r}
+# et pour les risques relatifs issus du sous-modèle de survie.
+round(exp(confint(jm3, parm = "Event")), 3)
+```
+
+
+```{r}
+intervals(lmeAR) 
+```
+t
+
+
+
+
+
+
+
+
+
+
 
