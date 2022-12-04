@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 ```
 
+## Data managing
+
 ```{r}
 base<-read.delim("~/Desktop/Master ST/M2/STA302/projet/base_3C_CVideal.txt")
 #View(base)
@@ -49,23 +51,21 @@ base$visite <- str_sub(base$visite, start = 4L)
 write.csv(base, file = "base.csv")
 ```
 
-#Retrait 5 sujets sans CES-D
-```{r}
-base2 <- subset(base, ID!=621&ID!=3874&ID!=5039&ID!=5432&ID!=5433)
-base2$delai_init <- base2$age_vis-base2$AGE0
-base2$CESD_rac_carr <- sqrt(base2$Score_CESDT)
-```
+# Variables indépendantes du temps
 
-#variables indépendantes du temps
 ```{r}
 var_indep_tps <- unique(base[,c("ID","DC6","AGEFIN6","SEXE","DEM0_6","AGEDEM6","CENTRE","ETUDE_clas0","antidep0","som","AGE0")])
 dim(var_indep_tps)
 ```
+
 Il y a 6626 sujets dans l'étude.
+
 ```{r}
 var_indep_tps_na <- na.omit(var_indep_tps)
 ```
+
 Il n'y a pas de données manquante pour ces variables.
+
 ```{r message=FALSE}
 library(epiR)
 library(prettyR)
@@ -115,9 +115,10 @@ library(lattice)
 nbmes <- table(Base1$ID[!is.na(Base1[,5])])
 quantile(nbmes,probs=(c(0,0.25,0.5,0.75,1)))
 ```
+
 Le délai considéré est l'age des sujets. A DISCUTER
 
-#Regarder un peu données manquantes
+#Regardons un peu données manquantes
 
 ```{r}
 table(is.na(base$Score_CESDT))
@@ -128,6 +129,7 @@ table(is.na(NA_age$Score_CESDT))
 Pour 9 440 visites nous n'avons ni l'âge du sujet ni le score CES-D. Cela correspond à 4019 sujets.
 
 Pour 647 visites nous n'avons pas le score CES-D correspondant.
+
 ```{r}
 unique(NA_age$ID)
 ```
@@ -188,7 +190,8 @@ chisq.test(tab)$expected
 chisq.test(tab,correct=F)
 
 ```
-Plus de DC chez les Données Manquantes (logique).
+
+Il y a plus de Données Manquantes chez les personnes décédées (logique).
 
 ```{r}
 freq(DonManq$DEM0_6)
@@ -216,13 +219,12 @@ freq(DonManq$visite[DonManq$DEM0_6==0])
 ```
 
 
-
 ```{r message=F}
 library(psych)
 describeBy(base,base$DonManq)
 ```
 
-#enlever
+
 ```{r}
 freq(DonManq$visite)
 freq(PasDonManq$visite)
@@ -237,13 +239,23 @@ chisq.test(base$DonManq,base$SEXE,correct=F)$expected
 ```
 plus grande part de SEXE=0 dans les données manquantes comparé aux données pas manquantes.
 
-#plots des trajectoires
-##plot délai
+# Retrait 5 sujets sans CES-D
+
+```{r}
+base2 <- subset(base, ID!=621&ID!=3874&ID!=5039&ID!=5432&ID!=5433)
+base2$delai_init <- base2$age_vis-base2$AGE0
+base2$CESD_rac_carr <- sqrt(base2$Score_CESDT)
+```
+
+#plots des trajectoires + plot délai
+
 ```{r}
 color <- base2$ID
 xyplot(log(Score_CESDT+0.5)~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
 ```
-#Avec transfo racine carrée du score CES-D
+
+# Avec transformation racine carrée du score CES-D
+
 ```{r}
 xyplot(CESD_rac_carr~delai_init,group=ID,data=base2,col=color,lwd=2,type='l',bty='n')
 ```
@@ -261,10 +273,9 @@ p
 
 ```
 
-
-
 #modele depression~age (intercept+pente vs intercept seul)
 #Modèle avec racine carré du score CES-D (pour que Y soit normal)
+
 ```{r}
 m_vide_intETpente_transfoY_del <- hlme(CESD_rac_carr ~ I(delai_init/5),
 random=~ (1+I(delai_init/5)), subject="ID",
@@ -281,6 +292,7 @@ devm1m2 <- 2*-47006.44 - 2*-47177.09
 pm1m2 <- 0.5*(1-pchisq(devm1m2,df=2)) + 0.5*(1-pchisq(devm1m2,df=1))
 pm1m2
 ```
+
 On garde la pente aléatoire.
 
 #effets aléatoires indépendants ?
@@ -295,6 +307,7 @@ devm1indep <- 2*logLik(m_vide_intETpente_transfoY_del) - 2*logLik(m1indep)
 p <- 1-pchisq(devm1indep ,df=1)
 p
 ```
+
 Les effets aléatoires semblent être corrélés entre eux.
 
 #SEXE
@@ -302,13 +315,15 @@ Les effets aléatoires semblent être corrélés entre eux.
 mSEXE <- lme(fixed=CESD_rac_carr~delai_init*SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mSEXE)
 ```
-intéraction avec le sexe non pertinente
+
+Ici l'intéraction avec le sexe est non pertinente
 
 ```{r}
 mSEXE <- lme(fixed=CESD_rac_carr~delai_init+SEXE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mSEXE)
 ```
-sans intéraction oui
+
+Nous gardons sans interaction
 
 #Antidépresseur
 
@@ -316,7 +331,8 @@ sans intéraction oui
 mAntidep <- lme(fixed=CESD_rac_carr~delai_init*antidep0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mAntidep)
 ```
-intéraction signif
+
+Nous avons ici une interaction significative
 
 #Niveau d'éducation
 
@@ -324,7 +340,9 @@ intéraction signif
 mNivEduc <- lme(fixed=CESD_rac_carr~delai_init*ETUDE_clas0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mNivEduc)
 ```
-intéraction non signif
+
+Nous avons ici une interaction non  significative
+
 ```{r}
 mNivEduc <- lme(fixed=CESD_rac_carr~delai_init+ETUDE_clas0,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mNivEduc)
@@ -336,7 +354,8 @@ summary(mNivEduc)
 mAgeInit <- lme(fixed=CESD_rac_carr~delai_init*I(AGE0-65),data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mAgeInit)
 ```
-interaction significative
+
+Nous avons ici une interaction significative
 
 #Ville
 
@@ -344,7 +363,8 @@ interaction significative
 mVILLE <- lme(fixed=CESD_rac_carr~delai_init*CENTRE,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mVILLE)
 ```
-interaction significative
+
+Nous avons ici une interaction significative
 
 #score cardiovasculaire
 ```{r}
@@ -355,7 +375,8 @@ summary(mCardioVasc)
 mCardioVasc_int <- lme(fixed=CESD_rac_carr~delai_init*som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(mCardioVasc_int)
 ```
-interaction significative
+
+Nous avons ici une interaction significative
 
 #modèle
 
@@ -364,14 +385,11 @@ modele <- lme(fixed=CESD_rac_carr~delai_init*(som+factor(CENTRE)+factor(antidep0
 summary(modele)#mettre Dijon en ref pour le centre
 ```
 
-
 ```{r}
 modele_interSOM = lme(fixed=CESD_rac_carr~delai_init*(CENTRE+antidep0+I(AGE0-65))+ETUDE_clas0+SEXE+som,data=base2,random=~delai_init|ID,method="ML",na.action=na.omit)
 summary(modele_interSOM)
 
 ```
-enlever l'interaction som:delai_init ne bouge rien (donc possible de le faire).
-A VOIR ce qu'on choisit de montrer.
 
 ```{r}
 plot(modele)
@@ -380,7 +398,8 @@ head(modele$fitted)
 head(modele$residuals)
 head(modele$coefficients$random$ID)
 ```
-regarder pour le problème d'hétéroscédasticité.
+Il y a ici un problème d'hétéroscédasticité.
+
 ```{r}
 #rajouter la densité au dessus
 {
@@ -408,7 +427,6 @@ data = base2,cor=AR(delai_init), verbose=F)
 
 summary(hlmeAR)
 ```
-
 
 ```{r}
 summarytable(hlmeAR,hlmeModele,which=c("npm","loglik","AIC"))
@@ -467,6 +485,7 @@ median(base2$AGE0)
 ##
 
 base$delai_dem=base$AGEDEM6-base$AGE0
+
 base <- subset(base, ID!=621&ID!=3874&ID!=5039&ID!=5432&ID!=5433)
 
 
